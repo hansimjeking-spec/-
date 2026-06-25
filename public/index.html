@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>복지자원 레이더</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48">
+            <path d="M12 11h24a4 4 0 0 1 4 4v22H8V15a4 4 0 0 1 4-4Z"></path>
+            <path d="M16 19h16M16 25h12M16 31h8"></path>
+            <path d="M34 29l4 4 6-8"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>복지자원 레이더</h1>
+          <p>사회복지 정보 취합·분류·요약</p>
+        </div>
+      </div>
+      <nav class="nav" aria-label="주요 화면">
+        <button class="nav-button active" type="button" data-view="dashboard">자원 수집 대시보드</button>
+        <button class="nav-button" type="button" data-view="collect">정보 수집</button>
+        <button class="nav-button" type="button" data-view="resources">자원 목록</button>
+        <button class="nav-button admin-only" type="button" data-view="brief" hidden>브리핑</button>
+        <button class="nav-button admin-only" type="button" data-view="settings" hidden>설정/백업</button>
+      </nav>
+      <div class="admin-panel">
+        <button class="ghost-button admin-toggle" id="toggleAdminMenu" type="button">관리자 모드</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-box">
+          <span aria-hidden="true">⌕</span>
+          <input id="globalSearch" type="search" placeholder="기관명, 키워드, 대상, 지역 검색">
+        </div>
+        <div class="top-actions">
+          <button class="ghost-button admin-only" id="exportBriefTop" type="button" hidden>브리핑 복사</button>
+          <button class="primary-button" id="openCollect" type="button">새 정보 수집</button>
+        </div>
+      </header>
+
+      <section class="view active" id="dashboardView">
+        <div class="section-heading dashboard-hero">
+          <div>
+            <h2>자원 수집 대시보드</h2>
+            <p>수집 현황, 분야 분포, 마감 흐름, 검토 대상을 한 화면에서 확인합니다.</p>
+          </div>
+          <div class="filter-row">
+            <select id="dashboardCategory"></select>
+            <select id="dashboardRegion"></select>
+          </div>
+        </div>
+
+        <div class="metrics-grid">
+          <article class="metric"><span>등록 자원</span><strong id="metricTotal">0</strong></article>
+          <article class="metric"><span>7일 내 마감</span><strong id="metricDue">0</strong></article>
+          <article class="metric"><span>고긴급</span><strong id="metricUrgent">0</strong></article>
+          <article class="metric"><span>미확인</span><strong id="metricNeedsReview">0</strong></article>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="panel wide collection-overview-panel">
+            <div class="panel-head">
+              <h3>수집 흐름 요약</h3>
+              <span class="status-chip" id="collectionHealth">대기</span>
+            </div>
+            <div class="collection-overview" id="collectionOverview"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>분야별 현황</h3>
+              <button class="text-button" id="copyCategoryStats" type="button">복사</button>
+            </div>
+            <div class="bar-list" id="categoryBars"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>곧 마감되는 자원</h3>
+              <button class="text-button" id="copyDueList" type="button">복사</button>
+            </div>
+            <div class="compact-list" id="dueList"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-head">
+              <h3>대상자 유형별 추천</h3>
+              <select id="targetFocus"></select>
+            </div>
+            <div class="recommendation-grid" id="recommendations"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="collectView">
+        <div class="section-heading">
+          <div>
+            <h2>정보 수집</h2>
+            <p>URL, 공고문 텍스트, 전화 메모를 붙여넣으면 핵심 정보를 자동 정리합니다.</p>
+          </div>
+        </div>
+
+        <form class="panel collect-panel" id="collectForm">
+          <div class="mode-tabs" role="tablist" aria-label="입력 방식">
+            <button class="mode-tab active" type="button" data-mode="url">URL</button>
+            <button class="mode-tab" type="button" data-mode="text">텍스트</button>
+            <button class="mode-tab" type="button" data-mode="manual">직접 입력</button>
+          </div>
+
+          <div class="input-mode active" id="urlMode">
+            <label>공고/기관 URL<input id="sourceUrl" type="url" placeholder="https://..."></label>
+          </div>
+          <div class="input-mode" id="textMode">
+            <label>공고문 또는 메모<textarea id="sourceText" rows="9" placeholder="지원 내용, 대상, 기간, 신청 방법, 연락처 등을 붙여넣기"></textarea></label>
+          </div>
+          <div class="input-mode" id="manualMode">
+            <div class="form-grid">
+              <label>제목<input id="manualTitle" type="text"></label>
+              <label>기관<input id="manualAgency" type="text"></label>
+              <label>분야<select id="manualCategory"></select></label>
+              <label>지역<input id="manualRegion" type="text" placeholder="전국, 서울, 관악구 등"></label>
+              <label>대상<input id="manualTargets" type="text" placeholder="독거노인, 한부모, 청년 등"></label>
+              <label>마감일<input id="manualDeadline" type="date"></label>
+              <label class="full-span">요약<textarea id="manualSummary" rows="4"></textarea></label>
+            </div>
+          </div>
+
+          <div class="collect-actions">
+            <button class="primary-button" id="analyzeSource" type="button">AI로 정리</button>
+            <button class="ghost-button" id="saveManual" type="button">그대로 저장</button>
+          </div>
+        </form>
+
+        <section class="panel source-panel">
+          <div class="panel-head">
+            <h3>지정 사이트 자동 수집</h3>
+            <span class="status-chip" id="sourceCollectStatus">대기</span>
+          </div>
+          <div class="source-grid single">
+            <label class="source-option"><input type="checkbox" class="source-check" value="chungbuk" checked><span>충북복지넷 사회복지자료 & 정보</span></label>
+          </div>
+          <label class="inline-check source-toggle"><input id="autoCollectDaily" type="checkbox"> 매일 첫 접속 시 자동 수집</label>
+          <div class="collect-actions">
+            <button class="primary-button" id="collectSources" type="button">선택 사이트 수집</button>
+            <button class="ghost-button" id="collectPreview" type="button">최근 수집 결과 보기</button>
+          </div>
+          <div class="compact-list" id="sourcePreview"></div>
+        </section>
+
+        <section class="panel" id="reviewPanel" hidden>
+          <div class="panel-head">
+            <h3>정리 결과 확인</h3>
+            <span class="status-chip" id="reviewConfidence">확인 필요</span>
+          </div>
+          <form class="form-grid" id="reviewForm">
+            <input id="reviewId" type="hidden">
+            <label>제목<input id="reviewTitle" type="text" required></label>
+            <label>기관<input id="reviewAgency" type="text"></label>
+            <label>분야<select id="reviewCategory"></select></label>
+            <label>지역<input id="reviewRegion" type="text"></label>
+            <label>긴급도<select id="reviewUrgency"><option>낮음</option><option>보통</option><option>높음</option></select></label>
+            <label>마감일<input id="reviewDeadline" type="date"></label>
+            <label>대상<input id="reviewTargets" type="text"></label>
+            <label>연락처<input id="reviewContact" type="text"></label>
+            <label class="full-span">요약<textarea id="reviewSummary" rows="4" required></textarea></label>
+            <label class="full-span">신청 방법<textarea id="reviewApply" rows="3"></textarea></label>
+            <label class="full-span">태그<input id="reviewTags" type="text" placeholder="쉼표로 구분"></label>
+            <div class="attachment-control full-span">
+              <span>첨부파일</span>
+              <input id="reviewAttachments" class="sr-only" type="file" multiple>
+              <label class="attachment-button" for="reviewAttachments">첨부파일 선택</label>
+              <span class="attachment-count" id="reviewAttachmentCount">선택된 파일 없음</span>
+            </div>
+            <div class="attachment-preview full-span" id="reviewAttachmentPreview"></div>
+            <label class="full-span">원문/메모<textarea id="reviewRaw" rows="5"></textarea></label>
+            <div class="form-actions">
+              <button class="primary-button" type="submit">자원으로 저장</button>
+              <button class="ghost-button" id="clearReview" type="button">비우기</button>
+            </div>
+          </form>
+        </section>
+      </section>
+
+      <section class="view" id="resourcesView">
+        <div class="section-heading">
+          <div>
+            <h2>카테고리별 자원 목록</h2>
+            <p>큰 분야별로 접어 보면서 필요한 자원만 빠르게 찾고 상태를 관리합니다.</p>
+          </div>
+          <div class="filter-row">
+            <select id="resourceCategory"></select>
+            <select id="resourceStatus"></select>
+            <select id="resourceUrgency"></select>
+          </div>
+        </div>
+        <div class="category-summary-grid" id="resourceCategorySummary"></div>
+        <div class="resource-list" id="resourceList"></div>
+      </section>
+
+      <section class="view" id="briefView">
+        <div class="section-heading">
+          <div>
+            <h2>주간 브리핑</h2>
+            <p>회의, 사례회의, 내부 공유용으로 바로 복사할 수 있게 정리합니다.</p>
+          </div>
+          <div class="top-actions">
+            <button class="ghost-button" id="copyBrief" type="button">복사</button>
+            <button class="ghost-button" id="downloadCsv" type="button">CSV</button>
+          </div>
+        </div>
+        <textarea class="brief-output" id="briefOutput" readonly></textarea>
+      </section>
+
+      <section class="view" id="settingsView">
+        <div class="section-heading">
+          <div>
+            <h2>설정/백업</h2>
+            <p>분야와 샘플 자료를 관리하고 JSON 백업으로 자료를 옮길 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <section class="panel">
+            <h3>자료 관리</h3>
+            <div class="button-row">
+              <button class="ghost-button" id="exportJson" type="button">JSON 백업</button>
+              <button class="ghost-button" id="restoreJsonButton" type="button">JSON 복원</button>
+              <input id="restoreJsonFile" type="file" accept="application/json,.json" hidden>
+              <button class="danger-button" id="resetData" type="button">전체 초기화</button>
+            </div>
+          </section>
+          <section class="panel">
+            <h3>빠른 시작</h3>
+            <div class="button-row">
+              <button class="primary-button" id="loadSamples" type="button">샘플 자원 불러오기</button>
+              <button class="ghost-button" id="clearSamples" type="button">샘플만 삭제</button>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="image-lightbox" id="imageLightbox" hidden>
+    <button class="lightbox-backdrop" id="closeLightboxBackdrop" type="button" aria-label="확대 화면 닫기"></button>
+    <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-label="첨부 이미지 확대 보기">
+      <div class="lightbox-head">
+        <button class="ghost-button lightbox-nav-button" id="prevLightbox" type="button">이전</button>
+        <strong id="lightboxTitle">첨부 이미지</strong>
+        <button class="ghost-button lightbox-nav-button" id="nextLightbox" type="button">다음</button>
+        <button class="ghost-button" id="closeLightbox" type="button">닫기</button>
+      </div>
+      <img id="lightboxImage" alt="">
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js" type="module"></script>
+</body>
+</html>
