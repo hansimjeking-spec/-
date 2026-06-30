@@ -254,7 +254,10 @@ async function collectBokjiro(limit) {
     "resultMessage",
     "resultMsg",
     "returnAuthMsg",
-    "errMsg"
+    "errMsg",
+    "message",
+    "msg",
+    "error"
   ].map((tag) => extractXmlValue(lastXml, tag)).find(Boolean);
   const code = extractXmlValue(lastXml, "resultCode");
   throw new Error(message || `복지로 제천시 API에서 자료를 찾지 못했습니다.${code ? ` (응답 코드: ${code})` : ""} (${describeApiResponse(lastXml)})`);
@@ -274,7 +277,7 @@ function extractXmlValue(xml, tag) {
 function extractBokjiroRecords(xml) {
   const json = parseJsonResponse(xml);
   if (json) {
-    const list = findJsonValue(json, "servList") || findJsonValue(json, "item") || [];
+    const list = findJsonValue(json, "servList") || findJsonValue(json, "item") || findJsonValue(json, "data") || [];
     return (Array.isArray(list) ? list : [list]).filter((item) => item?.servId && item?.servNm);
   }
   const normalizedXml = normalizeXmlTags(xml);
@@ -314,12 +317,16 @@ function findJsonValue(value, key) {
 
 function describeApiResponse(value) {
   const text = String(value || "").trim();
-  const format = parseJsonResponse(text) ? "JSON" : text.startsWith("<") ? "XML/HTML" : "텍스트";
+  const json = parseJsonResponse(text);
+  const format = json ? "JSON" : text.startsWith("<") ? "XML/HTML" : "텍스트";
+  const keys = json && typeof json === "object"
+    ? Object.keys(json).slice(0, 6)
+    : [];
   const tags = [...text.matchAll(/<\/?(?:[A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)\b/g)]
     .map((match) => match[1])
     .filter((tag, index, list) => list.indexOf(tag) === index)
     .slice(0, 6);
-  return `응답 ${text.length}자, ${format}${tags.length ? `, 태그 ${tags.join("/")}` : ""}`;
+  return `응답 ${text.length}자, ${format}${keys.length ? `, 키 ${keys.join("/")}` : ""}${tags.length ? `, 태그 ${tags.join("/")}` : ""}`;
 }
 
 function buildBokjiroResource(item) {
