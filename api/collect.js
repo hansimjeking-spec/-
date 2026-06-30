@@ -257,7 +257,7 @@ async function collectBokjiro(limit) {
     "errMsg"
   ].map((tag) => extractXmlValue(lastXml, tag)).find(Boolean);
   const code = extractXmlValue(lastXml, "resultCode");
-  throw new Error(message || `복지로 제천시 API에서 자료를 찾지 못했습니다.${code ? ` (응답 코드: ${code})` : ""}`);
+  throw new Error(message || `복지로 제천시 API에서 자료를 찾지 못했습니다.${code ? ` (응답 코드: ${code})` : ""} (${describeApiResponse(lastXml)})`);
 }
 
 function extractXmlValue(xml, tag) {
@@ -310,6 +310,16 @@ function findJsonValue(value, key) {
     if (found !== undefined) return found;
   }
   return undefined;
+}
+
+function describeApiResponse(value) {
+  const text = String(value || "").trim();
+  const format = parseJsonResponse(text) ? "JSON" : text.startsWith("<") ? "XML/HTML" : "텍스트";
+  const tags = [...text.matchAll(/<\/?(?:[A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)\b/g)]
+    .map((match) => match[1])
+    .filter((tag, index, list) => list.indexOf(tag) === index)
+    .slice(0, 6);
+  return `응답 ${text.length}자, ${format}${tags.length ? `, 태그 ${tags.join("/")}` : ""}`;
 }
 
 function buildBokjiroResource(item) {
