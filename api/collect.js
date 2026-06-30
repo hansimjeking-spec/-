@@ -270,7 +270,12 @@ function extractXmlValue(xml, tag) {
   if (json) {
     const value = findJsonValue(json, tag);
     if (value == null) return "";
-    return cleanText(typeof value === "object" ? JSON.stringify(value).slice(0, 300) : String(value));
+    if (typeof value === "object") {
+      const content = value.content || value.message || value.msg || value.error;
+      if (content) return cleanText(`${content}${value.code ? ` (${value.code})` : ""}`);
+      return cleanText(JSON.stringify(value).slice(0, 300));
+    }
+    return cleanText(String(value));
   }
   const normalizedXml = normalizeXmlTags(xml);
   const match = normalizedXml.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i"));
