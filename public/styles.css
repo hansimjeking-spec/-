@@ -1027,6 +1027,46 @@ label textarea {
   gap: 12px;
 }
 
+.source-help {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.source-help code {
+  color: var(--primary);
+  background: #eef7f4;
+  border-radius: 5px;
+  padding: 2px 5px;
+}
+
+.trash-metrics {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.trash-metrics span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px 12px;
+  color: var(--muted);
+}
+
+.trash-metrics strong {
+  color: var(--text);
+}
+
+.trash-list {
+  margin-top: 14px;
+}
+
+.trash-card {
+  border-left: 4px solid #b76d5f;
+}
+
 .toast {
   position: fixed;
   right: 22px;
