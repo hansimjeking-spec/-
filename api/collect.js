@@ -229,14 +229,30 @@ async function collectBokjiro(limit) {
   const serviceKey = process.env.DATA_GO_KR_SERVICE_KEY;
   if (!serviceKey) throw new Error("Vercel 환경변수 DATA_GO_KR_SERVICE_KEY 설정이 필요합니다.");
   const encodedKey = /%[0-9a-f]{2}/i.test(serviceKey) ? serviceKey : encodeURIComponent(serviceKey);
-  const localUrl = `https://apis.data.go.kr/B554287/LocalGovernmentWelfareInformations/LcgvWelfarelist?serviceKey=${encodedKey}&pageNo=1&numOfRows=${limit}&ctpvNm=${encodeURIComponent("충청북도")}&sggNm=${encodeURIComponent("제천시")}&arrgOrd=001`;
-  const xml = await fetchText(localUrl);
-  const records = extractBokjiroRecords(xml);
-  if (!records.length) {
-    const message = extractXmlValue(xml, "resultMessage") || extractXmlValue(xml, "resultMsg");
-    throw new Error(message || "복지로 제천시 API에서 자료를 찾지 못했습니다.");
+  const endpoint = "https://apis.data.go.kr/B554287/LocalGovernmentWelfareInformations/LcgvWelfarelist";
+  const attempts = [
+    { query: { ctpvNm: "충청북도", sggNm: "제천시" }, exact: true },
+    { query: { sggNm: "제천시" }, exact: true },
+    { query: { ctpvNm: "충청북도", numOfRows: Math.max(limit, 100) }, exact: false }
+  ];
+  let lastXml = "";
+  for (const attempt of attempts) {
+    const params = new URLSearchParams({
+      pageNo: "1",
+      numOfRows: String(attempt.query.numOfRows || limit),
+      arrgOrd: "001",
+      ...attempt.query
+    });
+    lastXml = await fetchText(`${endpoint}?serviceKey=${encodedKey}&${params}`);
+    const records = extractBokjiroRecords(lastXml);
+    const jecheonRecords = attempt.exact
+      ? records
+      : records.filter((item) => Object.values(item).some((value) => String(value).includes("제천")));
+    if (jecheonRecords.length) return jecheonRecords.slice(0, limit).map(buildBokjiroResource);
   }
-  return records.slice(0, limit).map(buildBokjiroResource);
+  const message = extractXmlValue(lastXml, "resultMessage") || extractXmlValue(lastXml, "resultMsg");
+  const code = extractXmlValue(lastXml, "resultCode");
+  throw new Error(message || `복지로 제천시 API에서 자료를 찾지 못했습니다.${code ? ` (응답 코드: ${code})` : ""}`);
 }
 
 function extractXmlValue(xml, tag) {
