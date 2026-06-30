@@ -269,7 +269,8 @@ function extractXmlValue(xml, tag) {
   const json = parseJsonResponse(xml);
   if (json) {
     const value = findJsonValue(json, tag);
-    return value == null ? "" : cleanText(String(value));
+    if (value == null) return "";
+    return cleanText(typeof value === "object" ? JSON.stringify(value).slice(0, 300) : String(value));
   }
   const normalizedXml = normalizeXmlTags(xml);
   const match = normalizedXml.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i"));
