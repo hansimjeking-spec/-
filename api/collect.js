@@ -250,18 +250,25 @@ async function collectBokjiro(limit) {
       : records.filter((item) => Object.values(item).some((value) => String(value).includes("제천")));
     if (jecheonRecords.length) return jecheonRecords.slice(0, limit).map(buildBokjiroResource);
   }
-  const message = extractXmlValue(lastXml, "resultMessage") || extractXmlValue(lastXml, "resultMsg");
+  const message = [
+    "resultMessage",
+    "resultMsg",
+    "returnAuthMsg",
+    "errMsg"
+  ].map((tag) => extractXmlValue(lastXml, tag)).find(Boolean);
   const code = extractXmlValue(lastXml, "resultCode");
   throw new Error(message || `복지로 제천시 API에서 자료를 찾지 못했습니다.${code ? ` (응답 코드: ${code})` : ""}`);
 }
 
 function extractXmlValue(xml, tag) {
-  const match = String(xml).match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i"));
+  const normalizedXml = normalizeXmlTags(xml);
+  const match = normalizedXml.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i"));
   return match ? cleanText(decodeEntities(match[1])) : "";
 }
 
 function extractBokjiroRecords(xml) {
-  const blocks = [...String(xml).matchAll(/<servList>([\s\S]*?)<\/servList>/gi)].map((match) => match[1]);
+  const normalizedXml = normalizeXmlTags(xml);
+  const blocks = [...normalizedXml.matchAll(/<servList>([\s\S]*?)<\/servList>/gi)].map((match) => match[1]);
   return blocks.map((block) => {
     const record = {};
     for (const match of block.matchAll(/<([A-Za-z][\w]*)>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/\1>/g)) {
@@ -269,6 +276,10 @@ function extractBokjiroRecords(xml) {
     }
     return record;
   }).filter((item) => item.servId && item.servNm);
+}
+
+function normalizeXmlTags(xml) {
+  return String(xml).replace(/(<\/?)[A-Za-z_][\w.-]*:/g, "$1");
 }
 
 function buildBokjiroResource(item) {
