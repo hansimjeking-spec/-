@@ -3,6 +3,7 @@ const AUTO_COLLECT_KEY = "welfareResourceRadar.lastAutoCollectDate";
 const AUTO_COLLECT_ENABLED_KEY = "welfareResourceRadar.autoCollectDaily";
 const ADMIN_MENU_KEY = "welfareResourceRadar.adminMenu";
 const ADMIN_PIN_KEY = "welfareResourceRadar.adminPin";
+const AUTO_SOURCES = ["chungbuk", "jecheonWelfare", "jecheonNotices", "bokjiro", "jecheonEmployment"];
 const CATEGORIES = ["생계", "주거", "의료", "돌봄", "교육", "고용", "심리정서", "법률", "긴급지원", "기타"];
 const STATUSES = ["검토 필요", "확인 완료", "신청 예정", "신청 완료", "보류", "종료"];
 const TARGETS = ["전체", "독거노인", "장애인", "한부모", "아동·청소년", "청년", "중장년", "위기가구", "이주민", "노숙·주거취약"];
@@ -22,15 +23,22 @@ function uid() {
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { resources: [], filters: {} };
+  if (!raw) return { resources: [], trash: [], blockedKeys: [], filters: {} };
   try {
     const parsed = JSON.parse(raw);
+    const trash = Array.isArray(parsed.trash)
+      ? parsed.trash.map((item) => ({ ...normalizeResource(item), deletedAt: item.deletedAt || new Date().toISOString() }))
+      : [];
+    const blockedKeys = new Set(Array.isArray(parsed.blockedKeys) ? parsed.blockedKeys : []);
+    trash.forEach((item) => resourceKeys(item).forEach((key) => blockedKeys.add(key)));
     return {
       resources: Array.isArray(parsed.resources) ? parsed.resources.map(normalizeResource) : [],
+      trash,
+      blockedKeys: [...blockedKeys],
       filters: parsed.filters || {}
     };
   } catch {
-    return { resources: [], filters: {} };
+    return { resources: [], trash: [], blockedKeys: [], filters: {} };
   }
 }
 
@@ -124,6 +132,7 @@ function bindEvents() {
   $("#restoreJsonButton").addEventListener("click", () => $("#restoreJsonFile").click());
   $("#restoreJsonFile").addEventListener("change", restoreJson);
   $("#resetData").addEventListener("click", resetData);
+  $("#clearBlockedKeys").addEventListener("click", clearBlockedKeys);
   $("#loadSamples").addEventListener("click", loadSamples);
   $("#clearSamples").addEventListener("click", clearSamples);
   $("#closeLightbox").addEventListener("click", closeImageLightbox);
@@ -164,7 +173,7 @@ function setAdminMenu(enabled) {
     item.hidden = !enabled;
   });
   $("#toggleAdminMenu").textContent = enabled ? "관리자 모드 종료" : "관리자 모드";
-  if (!enabled && ["brief", "settings"].includes($(".nav-button.active")?.dataset.view)) {
+  if (!enabled && ["trash", "brief", "settings"].includes($(".nav-button.active")?.dataset.view)) {
     activateView("dashboard");
   }
 }
@@ -185,7 +194,7 @@ function scheduleDailyAutoCollect() {
   const today = new Date().toISOString().slice(0, 10);
   if (localStorage.getItem(AUTO_COLLECT_KEY) === today) return;
   window.setTimeout(async () => {
-    const added = await runSourceCollection(["chungbuk"], { silent: true });
+    const added = await runSourceCollection(AUTO_SOURCES, { silent: true });
     localStorage.setItem(AUTO_COLLECT_KEY, today);
     if (added > 0) showToast(`오늘 새 복지자료 ${added}건을 자동 수집했습니다.`);
   }, 900);
@@ -215,10 +224,14 @@ async function runSourceCollection(sources, options = {}) {
     const result = await response.json();
     lastCollected = result.resources || [];
     const added = addCollectedResources(lastCollected);
-    $("#sourceCollectStatus").textContent = `${added}건 추가`;
+    const failed = Array.isArray(result.errors) ? result.errors : [];
+    $("#sourceCollectStatus").textContent = failed.length ? `${added}건 추가 · ${failed.length}곳 확인 필요` : `${added}건 추가`;
     renderAll();
     renderSourcePreview();
-    if (!silent) showToast(`자동 수집 완료: ${added}건을 새로 추가했습니다.`);
+    if (!silent) {
+      const suffix = failed.length ? ` (${failed.map((item) => item.name || item.source).join(", ")} 확인 필요)` : "";
+      showToast(`자동 수집 완료: ${added}건을 새로 추가했습니다.${suffix}`);
+    }
     return added;
   } catch (error) {
     $("#sourceCollectStatus").textContent = "실패";
@@ -230,14 +243,17 @@ async function runSourceCollection(sources, options = {}) {
 }
 
 function addCollectedResources(resources) {
-  const known = new Set(state.resources.flatMap((item) => [item.sourceUrl, item.title].filter(Boolean)));
+  const known = new Set([
+    ...state.blockedKeys,
+    ...state.resources.flatMap(resourceKeys)
+  ]);
   let added = 0;
   resources.forEach((item) => {
     const resource = normalizeResource({ ...item, status: "검토 필요" });
-    const key = resource.sourceUrl || resource.title;
-    if (!key || known.has(key)) return;
+    const keys = resourceKeys(resource);
+    if (!keys.length || keys.some((key) => known.has(key))) return;
     state.resources.unshift(resource);
-    known.add(key);
+    keys.forEach((key) => known.add(key));
     added += 1;
   });
   if (added) saveState();
@@ -420,7 +436,39 @@ function renderAll() {
   if (regions().includes(selectedRegion)) $("#dashboardRegion").value = selectedRegion;
   renderDashboard();
   renderResources();
+  renderTrash();
   $("#briefOutput").value = buildBrief();
+}
+
+function renderTrash() {
+  $("#trashCount").textContent = formatNumber(state.trash.length);
+  $("#blockedCount").textContent = formatNumber(state.blockedKeys.length);
+  $("#trashList").innerHTML = state.trash.length ? state.trash
+    .slice()
+    .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt))
+    .map((item) => `
+      <article class="resource-card trash-card">
+        <div class="resource-head">
+          <div>
+            <h3 class="resource-title">${escapeHtml(item.title)}</h3>
+            <div class="resource-meta">
+              <span>${escapeHtml(item.agency || "기관 미기재")}</span>
+              <span>${escapeHtml(item.category)}</span>
+              <span>${escapeHtml(item.region)}</span>
+              <span>삭제 ${escapeHtml(new Date(item.deletedAt).toLocaleString("ko-KR"))}</span>
+            </div>
+          </div>
+          <span class="status-chip">재수집 차단</span>
+        </div>
+        <p class="resource-summary">${escapeHtml(item.summary || "요약 없음")}</p>
+        <div class="resource-actions">
+          <button class="primary-button restore-resource" type="button" data-id="${escapeHtml(item.id)}">복원</button>
+          <button class="danger-button purge-resource" type="button" data-id="${escapeHtml(item.id)}">영구 삭제</button>
+        </div>
+      </article>
+    `).join("") : emptyState("휴지통이 비어 있습니다.");
+  $$(".restore-resource").forEach((button) => button.addEventListener("click", () => restoreResource(button.dataset.id)));
+  $$(".purge-resource").forEach((button) => button.addEventListener("click", () => purgeResource(button.dataset.id)));
 }
 
 function filteredResources() {
@@ -818,11 +866,53 @@ function editResource(id) {
 
 function deleteResource(id) {
   const item = state.resources.find((resource) => resource.id === id);
-  if (!item || !confirm(`"${item.title}" 자원을 삭제할까요?`)) return;
+  if (!item || !confirm(`"${item.title}" 자원을 휴지통으로 이동할까요?\n자동 수집에서도 다시 추가되지 않습니다.`)) return;
+  const deleted = { ...item, deletedAt: new Date().toISOString() };
+  state.trash.unshift(deleted);
+  const blocked = new Set(state.blockedKeys);
+  resourceKeys(item).forEach((key) => blocked.add(key));
+  state.blockedKeys = [...blocked];
   state.resources = state.resources.filter((resource) => resource.id !== id);
   saveState();
   renderAll();
-  showToast("삭제했습니다.");
+  showToast("휴지통으로 이동하고 재수집을 차단했습니다.");
+}
+
+function restoreResource(id) {
+  const item = state.trash.find((resource) => resource.id === id);
+  if (!item) return;
+  const { deletedAt, ...restored } = item;
+  state.trash = state.trash.filter((resource) => resource.id !== id);
+  const restoredKeys = new Set(resourceKeys(item));
+  const remainingTrashKeys = new Set(state.trash.flatMap(resourceKeys));
+  state.blockedKeys = state.blockedKeys.filter((key) => !restoredKeys.has(key) || remainingTrashKeys.has(key));
+  state.resources.unshift(normalizeResource({ ...restored, updatedAt: new Date().toISOString() }));
+  saveState();
+  renderAll();
+  showToast("자원을 복원하고 재수집 차단을 해제했습니다.");
+}
+
+function purgeResource(id) {
+  const item = state.trash.find((resource) => resource.id === id);
+  if (!item || !confirm(`"${item.title}" 자원을 휴지통에서 영구 삭제할까요?\n재수집 차단 기록은 유지됩니다.`)) return;
+  state.trash = state.trash.filter((resource) => resource.id !== id);
+  saveState();
+  renderAll();
+  showToast("자원 내용은 삭제하고 재수집 차단 기록은 유지했습니다.");
+}
+
+function clearBlockedKeys() {
+  const trashKeys = new Set(state.trash.flatMap(resourceKeys));
+  const orphanCount = state.blockedKeys.filter((key) => !trashKeys.has(key)).length;
+  if (!orphanCount) {
+    showToast("해제할 영구 삭제 차단 기록이 없습니다.");
+    return;
+  }
+  if (!confirm(`영구 삭제한 자원의 재수집 차단 기록 ${orphanCount}개를 해제할까요?\n다음 수집에서 다시 추가될 수 있습니다.`)) return;
+  state.blockedKeys = [...trashKeys];
+  saveState();
+  renderAll();
+  showToast("영구 삭제 자원의 재수집 차단을 해제했습니다.");
 }
 
 function updateStatus(id, status) {
@@ -1014,6 +1104,10 @@ function restoreJson() {
     try {
       const restored = JSON.parse(String(reader.result || "{}"));
       state.resources = Array.isArray(restored.resources) ? restored.resources.map(normalizeResource) : [];
+      state.trash = Array.isArray(restored.trash)
+        ? restored.trash.map((item) => ({ ...normalizeResource(item), deletedAt: item.deletedAt || new Date().toISOString() }))
+        : [];
+      state.blockedKeys = Array.isArray(restored.blockedKeys) ? restored.blockedKeys : [];
       state.filters = restored.filters || {};
       saveState();
       renderAll();
@@ -1026,7 +1120,12 @@ function restoreJson() {
 }
 
 function resetData() {
-  if (!confirm("모든 자원을 삭제할까요? 먼저 JSON 백업을 권장합니다.")) return;
+  if (!confirm("모든 자원을 휴지통으로 이동할까요? 먼저 JSON 백업을 권장합니다.")) return;
+  const deletedAt = new Date().toISOString();
+  const blocked = new Set(state.blockedKeys);
+  state.resources.forEach((item) => resourceKeys(item).forEach((key) => blocked.add(key)));
+  state.trash = [...state.resources.map((item) => ({ ...item, deletedAt })), ...state.trash];
+  state.blockedKeys = [...blocked];
   state.resources = [];
   saveState();
   renderAll();
@@ -1104,6 +1203,34 @@ function summarizePlainText(text) {
 
 function regions() {
   return [...new Set(state.resources.map((item) => item.region).filter(Boolean))].sort();
+}
+
+function resourceKeys(item) {
+  const keys = [];
+  const url = canonicalUrl(item?.sourceUrl);
+  const title = normalizeKeyText(item?.title);
+  const agency = normalizeKeyText(item?.agency);
+  if (url) keys.push(`url:${url}`);
+  if (title) keys.push(`title:${title}|${agency}`);
+  return keys;
+}
+
+function canonicalUrl(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid"]
+      .forEach((key) => url.searchParams.delete(key));
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return url.toString().replace(/\?$/, "").toLowerCase();
+  } catch {
+    return String(value).trim().toLowerCase();
+  }
+}
+
+function normalizeKeyText(value) {
+  return String(value || "").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function splitList(value) {

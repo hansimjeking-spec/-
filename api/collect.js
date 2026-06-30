@@ -8,6 +8,39 @@ const SOURCES = {
       "https://www.043w.or.kr/www/selectBbsNttList.do?key=150&bbsNo=21&searchCtgry=&pageUnit=10&searchCnd=all&searchKrwd=&pageIndex=3&integrDeptCode="
     ],
     type: "chungbuk"
+  },
+  jecheonWelfare: {
+    name: "제천시 복지다담",
+    agency: "제천시 복지다담",
+    region: "제천시",
+    listUrls: [
+      "https://www.jecheon.go.kr/bokjidadam/www/selectBbsNttList.do?key=43&bbsNo=5&pageIndex=1",
+      "https://www.jecheon.go.kr/bokjidadam/www/selectBbsNttList.do?key=43&bbsNo=5&pageIndex=2",
+      "https://www.jecheon.go.kr/bokjidadam/www/selectBbsNttList.do?key=43&bbsNo=5&pageIndex=3"
+    ],
+    type: "jecheonBbs"
+  },
+  jecheonNotices: {
+    name: "제천시 고시공고",
+    agency: "제천시",
+    region: "제천시",
+    listUrls: ["https://www.jecheon.go.kr/rssBbsNtt.do?bbsNo=18&integrDeptCode="],
+    type: "rss",
+    titleFilter: /(복지|지원|돌봄|바우처|장애|노인|아동|청소년|청년|여성|가족|한부모|다문화|위기|생계|주거|일자리|교육|건강|의료|모집|신청)/
+  },
+  bokjiro: {
+    name: "복지로",
+    agency: "한국사회보장정보원",
+    region: "제천시",
+    type: "bokjiroApi"
+  },
+  jecheonEmployment: {
+    name: "제천고용복지+센터",
+    agency: "제천고용복지+센터",
+    region: "제천시",
+    listUrls: ["https://www.work.go.kr/jecheon/main.do"],
+    type: "workGo",
+    titleFilter: /(지원|고용|취업|일자리|훈련|교육|외국인|청년|여성|고령자|장애인|안내|공고|모집)/
   }
 };
 
@@ -34,7 +67,7 @@ export default async function handler(request, response) {
         const items = await collectSource(source, limitPerSource);
         resources.push(...items);
       } catch (error) {
-        errors.push({ source: key, message: error.message });
+        errors.push({ source: key, name: source.name, message: error.message });
       }
     }
 
@@ -49,10 +82,13 @@ export default async function handler(request, response) {
 }
 
 async function collectSource(source, limit) {
+  if (source.type === "bokjiroApi") return collectBokjiro(limit);
   const links = [];
   for (const listUrl of source.listUrls) {
     const html = await fetchText(listUrl);
-    links.push(...extractLinks(html, listUrl, source).slice(0, limit));
+    const extracted = extractLinks(html, listUrl, source)
+      .filter((item) => !source.titleFilter || source.titleFilter.test(item.title));
+    links.push(...extracted.slice(0, limit));
     if (links.length >= limit) break;
   }
 
@@ -86,8 +122,10 @@ async function fetchText(url) {
 
 function extractLinks(html, baseUrl, source) {
   if (source.type === "chungbuk") return extractChungbukLinks(html, baseUrl);
+  if (source.type === "jecheonBbs") return extractChungbukLinks(html, baseUrl);
   if (source.type === "bokji") return extractBokjiLinks(html, baseUrl);
   if (source.type === "rss") return extractRssLinks(html);
+  if (source.type === "workGo") return extractWorkGoLinks(html, baseUrl);
   return extractGenericLinks(html, baseUrl);
 }
 
@@ -120,12 +158,25 @@ function extractBokjiLinks(html, baseUrl) {
 
 function extractRssLinks(xml) {
   const links = [];
-  const pattern = /<item>[\s\S]*?<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>[\s\S]*?<link>([\s\S]*?)<\/link>[\s\S]*?<\/item>/gi;
+  const pattern = /<item>[\s\S]*?<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>[\s\S]*?<link>([\s\S]*?)<\/link>[\s\S]*?<\/item>/gi;
   let match;
   while ((match = pattern.exec(xml))) {
     links.push({
       title: cleanText(match[1]),
-      url: cleanText(match[2])
+      url: decodeEntities(cleanText(match[2]))
+    });
+  }
+  return links;
+}
+
+function extractWorkGoLinks(html, baseUrl) {
+  const links = [];
+  const pattern = /<a\s+href="([^"]*\/jecheon\/newsPlace\/notice\/noticeDetail\.do[^"]*)"[^>]*>[\s\S]*?<strong[^>]*>([\s\S]*?)<\/strong>[\s\S]*?<\/a>/gi;
+  let match;
+  while ((match = pattern.exec(html))) {
+    links.push({
+      url: absoluteUrl(match[1], baseUrl),
+      title: cleanText(match[2]).replace(/\.\.\.$/, "")
     });
   }
   return links;
@@ -154,7 +205,7 @@ function buildResource(item, source) {
     title: item.title || firstLine(text) || "새 복지자료",
     agency: source.agency,
     category: guessCategory(text),
-    region: guessRegion(text),
+    region: source.region || guessRegion(text),
     targets: guessTargets(text),
     deadline,
     contact: guessContact(text),
@@ -169,6 +220,71 @@ function buildResource(item, source) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
+}
+
+async function collectBokjiro(limit) {
+  const serviceKey = process.env.DATA_GO_KR_SERVICE_KEY;
+  if (!serviceKey) throw new Error("Vercel 환경변수 DATA_GO_KR_SERVICE_KEY 설정이 필요합니다.");
+  const encodedKey = /%[0-9a-f]{2}/i.test(serviceKey) ? serviceKey : encodeURIComponent(serviceKey);
+  const localUrl = `https://apis.data.go.kr/B554287/LocalGovernmentWelfareInformations/LcgvWelfarelist?serviceKey=${encodedKey}&pageNo=1&numOfRows=${limit}&ctpvNm=${encodeURIComponent("충청북도")}&sggNm=${encodeURIComponent("제천시")}&arrgOrd=001`;
+  const centralUrl = `https://apis.data.go.kr/B554287/NationalWelfareInformationsV001/NationalWelfarelistV001?serviceKey=${encodedKey}&pageNo=1&numOfRows=${limit}`;
+  const results = await Promise.allSettled([fetchText(localUrl), fetchText(centralUrl)]);
+  const records = results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => extractBokjiroRecords(result.value));
+  if (!records.length) {
+    const reason = results.find((result) => result.status === "rejected")?.reason;
+    throw reason || new Error("복지로 API에서 자료를 찾지 못했습니다.");
+  }
+  return records.slice(0, limit).map(buildBokjiroResource);
+}
+
+function extractBokjiroRecords(xml) {
+  const blocks = [...String(xml).matchAll(/<servList>([\s\S]*?)<\/servList>/gi)].map((match) => match[1]);
+  return blocks.map((block) => {
+    const record = {};
+    for (const match of block.matchAll(/<([A-Za-z][\w]*)>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/\1>/g)) {
+      record[match[1]] = cleanText(decodeEntities(match[2]));
+    }
+    return record;
+  }).filter((item) => item.servId && item.servNm);
+}
+
+function buildBokjiroResource(item) {
+  const text = [
+    item.servNm, item.servDgst, item.sprtTrgtCn, item.slctCritCn, item.alwServCn,
+    item.aplyMtdNm, item.lifeNmArray, item.trgterIndvdlNmArray, item.intrsThemaNmArray
+  ].filter(Boolean).join("\n");
+  const deadline = normalizeApiDate(item.enfcEndYmd);
+  return {
+    title: item.servNm,
+    agency: item.bizChrDeptNm || "복지로",
+    category: guessCategory(text),
+    region: item.sggNm || item.ctpvNm || "전국",
+    targets: [...new Set([...guessTargets(text), ...splitApiValues(item.trgterIndvdlNmArray), ...splitApiValues(item.lifeNmArray)])].slice(0, 5),
+    deadline,
+    contact: guessContact(text),
+    summary: item.servDgst || summarize(text),
+    applyMethod: item.aplyMtdNm || guessApplyMethod(text),
+    tags: [...new Set(["복지로", ...splitApiValues(item.intrsThemaNmArray)])].slice(0, 6),
+    urgency: deadline && daysLeft(deadline) <= 7 ? "높음" : "보통",
+    status: "검토 필요",
+    sourceUrl: item.servDtlLink || `https://www.bokjiro.go.kr/ssis-tbu/index.do?servId=${encodeURIComponent(item.servId)}`,
+    rawText: text.slice(0, 12000),
+    attachments: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function normalizeApiDate(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length !== 8) return "";
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+}
+
+function splitApiValues(value) {
+  return String(value || "").split(/[,|/]/).map((item) => item.trim()).filter(Boolean);
 }
 
 function extractAttachments(html, baseUrl) {

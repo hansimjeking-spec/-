@@ -26,6 +26,7 @@
         <button class="nav-button active" type="button" data-view="dashboard">자원 수집 대시보드</button>
         <button class="nav-button" type="button" data-view="collect">정보 수집</button>
         <button class="nav-button" type="button" data-view="resources">자원 목록</button>
+        <button class="nav-button admin-only" type="button" data-view="trash" hidden>휴지통</button>
         <button class="nav-button admin-only" type="button" data-view="brief" hidden>브리핑</button>
         <button class="nav-button admin-only" type="button" data-view="settings" hidden>설정/백업</button>
       </nav>
@@ -141,9 +142,14 @@
             <h3>지정 사이트 자동 수집</h3>
             <span class="status-chip" id="sourceCollectStatus">대기</span>
           </div>
-          <div class="source-grid single">
+          <div class="source-grid">
             <label class="source-option"><input type="checkbox" class="source-check" value="chungbuk" checked><span>충북복지넷 사회복지자료 & 정보</span></label>
+            <label class="source-option"><input type="checkbox" class="source-check" value="jecheonWelfare" checked><span>제천시 복지다담 복지소식</span></label>
+            <label class="source-option"><input type="checkbox" class="source-check" value="jecheonNotices" checked><span>제천시 고시공고</span></label>
+            <label class="source-option"><input type="checkbox" class="source-check" value="bokjiro" checked><span>복지로 제천시·중앙부처 서비스</span></label>
+            <label class="source-option"><input type="checkbox" class="source-check" value="jecheonEmployment" checked><span>제천고용복지+센터</span></label>
           </div>
+          <p class="source-help">복지로 수집은 Vercel 환경변수 <code>DATA_GO_KR_SERVICE_KEY</code>에 공공데이터포털 인증키를 설정해야 합니다.</p>
           <label class="inline-check source-toggle"><input id="autoCollectDaily" type="checkbox"> 매일 첫 접속 시 자동 수집</label>
           <div class="collect-actions">
             <button class="primary-button" id="collectSources" type="button">선택 사이트 수집</button>
@@ -200,6 +206,27 @@
         </div>
         <div class="category-summary-grid" id="resourceCategorySummary"></div>
         <div class="resource-list" id="resourceList"></div>
+      </section>
+
+      <section class="view" id="trashView">
+        <div class="section-heading">
+          <div>
+            <h2>휴지통</h2>
+            <p>삭제한 자원을 보관하고 자동 수집에서 다시 들어오지 않도록 차단합니다.</p>
+          </div>
+          <div class="trash-metrics">
+            <span>보관 <strong id="trashCount">0</strong>건</span>
+            <span>재수집 차단 <strong id="blockedCount">0</strong>개</span>
+          </div>
+        </div>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>삭제한 자원</h3>
+            <button class="danger-button" id="clearBlockedKeys" type="button">영구 삭제 차단 해제</button>
+          </div>
+          <p class="source-help">휴지통 자원은 항상 재수집이 차단됩니다. 영구 삭제한 자원을 다시 수집하려면 남은 차단 기록을 해제하세요.</p>
+          <div class="resource-list trash-list" id="trashList"></div>
+        </section>
       </section>
 
       <section class="view" id="briefView">
