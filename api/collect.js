@@ -240,7 +240,6 @@ async function collectBokjiro(limit) {
     const params = new URLSearchParams({
       pageNo: "1",
       numOfRows: String(attempt.query.numOfRows || limit),
-      arrgOrd: "001",
       ...attempt.query
     });
     lastXml = await fetchText(`${endpoint}?serviceKey=${encodedKey}&${params}`);
