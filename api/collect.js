@@ -92,12 +92,12 @@ async function collectSource(source, limit) {
     if (links.length >= limit) break;
   }
 
-  const resources = [];
-  for (const link of links.slice(0, limit)) {
+  const selected = links.slice(0, limit);
+  const details = await Promise.all(selected.map(async (link) => {
     const detail = await fetchDetail(link).catch(() => ({ text: link.title, url: link.url }));
-    resources.push(buildResource({ ...link, ...detail }, source));
-  }
-  return resources;
+    return buildResource({ ...link, ...detail }, source);
+  }));
+  return details;
 }
 
 async function fetchDetail(link) {
@@ -116,7 +116,10 @@ async function fetchText(url) {
       "accept": "text/html,text/plain,application/xhtml+xml"
     }
   });
-  if (!result.ok) throw new Error(`${url} ${result.status}`);
+  if (!result.ok) {
+    const safeUrl = new URL(url);
+    throw new Error(`${safeUrl.origin}${safeUrl.pathname} ${result.status}`);
+  }
   return await result.text();
 }
 
@@ -227,16 +230,18 @@ async function collectBokjiro(limit) {
   if (!serviceKey) throw new Error("Vercel 환경변수 DATA_GO_KR_SERVICE_KEY 설정이 필요합니다.");
   const encodedKey = /%[0-9a-f]{2}/i.test(serviceKey) ? serviceKey : encodeURIComponent(serviceKey);
   const localUrl = `https://apis.data.go.kr/B554287/LocalGovernmentWelfareInformations/LcgvWelfarelist?serviceKey=${encodedKey}&pageNo=1&numOfRows=${limit}&ctpvNm=${encodeURIComponent("충청북도")}&sggNm=${encodeURIComponent("제천시")}&arrgOrd=001`;
-  const centralUrl = `https://apis.data.go.kr/B554287/NationalWelfareInformationsV001/NationalWelfarelistV001?serviceKey=${encodedKey}&pageNo=1&numOfRows=${limit}`;
-  const results = await Promise.allSettled([fetchText(localUrl), fetchText(centralUrl)]);
-  const records = results
-    .filter((result) => result.status === "fulfilled")
-    .flatMap((result) => extractBokjiroRecords(result.value));
+  const xml = await fetchText(localUrl);
+  const records = extractBokjiroRecords(xml);
   if (!records.length) {
-    const reason = results.find((result) => result.status === "rejected")?.reason;
-    throw reason || new Error("복지로 API에서 자료를 찾지 못했습니다.");
+    const message = extractXmlValue(xml, "resultMessage") || extractXmlValue(xml, "resultMsg");
+    throw new Error(message || "복지로 제천시 API에서 자료를 찾지 못했습니다.");
   }
   return records.slice(0, limit).map(buildBokjiroResource);
+}
+
+function extractXmlValue(xml, tag) {
+  const match = String(xml).match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i"));
+  return match ? cleanText(decodeEntities(match[1])) : "";
 }
 
 function extractBokjiroRecords(xml) {
