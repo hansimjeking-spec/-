@@ -261,12 +261,22 @@ async function collectBokjiro(limit) {
 }
 
 function extractXmlValue(xml, tag) {
+  const json = parseJsonResponse(xml);
+  if (json) {
+    const value = findJsonValue(json, tag);
+    return value == null ? "" : cleanText(String(value));
+  }
   const normalizedXml = normalizeXmlTags(xml);
   const match = normalizedXml.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`, "i"));
   return match ? cleanText(decodeEntities(match[1])) : "";
 }
 
 function extractBokjiroRecords(xml) {
+  const json = parseJsonResponse(xml);
+  if (json) {
+    const list = findJsonValue(json, "servList") || findJsonValue(json, "item") || [];
+    return (Array.isArray(list) ? list : [list]).filter((item) => item?.servId && item?.servNm);
+  }
   const normalizedXml = normalizeXmlTags(xml);
   const blocks = [...normalizedXml.matchAll(/<servList>([\s\S]*?)<\/servList>/gi)].map((match) => match[1]);
   return blocks.map((block) => {
@@ -280,6 +290,26 @@ function extractBokjiroRecords(xml) {
 
 function normalizeXmlTags(xml) {
   return String(xml).replace(/(<\/?)[A-Za-z_][\w.-]*:/g, "$1");
+}
+
+function parseJsonResponse(value) {
+  const text = String(value || "").trim();
+  if (!text.startsWith("{") && !text.startsWith("[")) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function findJsonValue(value, key) {
+  if (!value || typeof value !== "object") return undefined;
+  if (Object.prototype.hasOwnProperty.call(value, key)) return value[key];
+  for (const nested of Object.values(value)) {
+    const found = findJsonValue(nested, key);
+    if (found !== undefined) return found;
+  }
+  return undefined;
 }
 
 function buildBokjiroResource(item) {
