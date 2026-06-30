@@ -233,7 +233,8 @@ async function collectBokjiro(limit) {
   const attempts = [
     { query: { ctpvNm: "충청북도", sggNm: "제천시" }, exact: true },
     { query: { sggNm: "제천시" }, exact: true },
-    { query: { ctpvNm: "충청북도", numOfRows: Math.max(limit, 100) }, exact: false }
+    { query: { ctpvNm: "충청북도", numOfRows: Math.max(limit, 100) }, exact: false },
+    { query: { numOfRows: 1000 }, exact: false }
   ];
   let lastXml = "";
   for (const attempt of attempts) {
