@@ -257,7 +257,9 @@ async function collectBokjiro(limit) {
     "errMsg",
     "message",
     "msg",
-    "error"
+    "error",
+    "dmMessage",
+    "dmMsg"
   ].map((tag) => extractXmlValue(lastXml, tag)).find(Boolean);
   const code = extractXmlValue(lastXml, "resultCode");
   throw new Error(message || `복지로 제천시 API에서 자료를 찾지 못했습니다.${code ? ` (응답 코드: ${code})` : ""} (${describeApiResponse(lastXml)})`);
