@@ -173,7 +173,7 @@ function setAdminMenu(enabled) {
     item.hidden = !enabled;
   });
   $("#toggleAdminMenu").textContent = enabled ? "관리자 모드 종료" : "관리자 모드";
-  if (!enabled && ["trash", "brief", "settings"].includes($(".nav-button.active")?.dataset.view)) {
+  if (!enabled && ["brief", "settings"].includes($(".nav-button.active")?.dataset.view)) {
     activateView("dashboard");
   }
 }
