@@ -27,7 +27,11 @@ function loadState() {
   try {
     const parsed = JSON.parse(raw);
     const trash = Array.isArray(parsed.trash)
-      ? parsed.trash.map((item) => ({ ...normalizeResource(item), deletedAt: item.deletedAt || new Date().toISOString() }))
+      ? parsed.trash.map((item) => ({
+        ...normalizeResource(item),
+        deletedAt: item.deletedAt || new Date().toISOString(),
+        deletedReason: item.deletedReason || "manual"
+      }))
       : [];
     const blockedKeys = new Set(Array.isArray(parsed.blockedKeys) ? parsed.blockedKeys : []);
     trash.forEach((item) => resourceKeys(item).forEach((key) => blockedKeys.add(key)));
@@ -62,6 +66,7 @@ function normalizeResource(item) {
     attachments: Array.isArray(item.attachments) ? item.attachments.map(normalizeAttachment) : [],
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
+    important: Boolean(item.important),
     sample: Boolean(item.sample)
   };
 }
@@ -86,8 +91,16 @@ function init() {
   bindEvents();
   initAutoCollectControl();
   initAdminMenu();
+  archiveExpiredResources();
   renderAll();
   scheduleDailyAutoCollect();
+  window.setInterval(() => {
+    const archived = archiveExpiredResources();
+    if (archived > 0) {
+      renderAll();
+      showToast(`마감이 지난 자원 ${archived}건을 휴지통으로 이동했습니다.`);
+    }
+  }, 60 * 60 * 1000);
 }
 
 function fillSelects() {
@@ -222,7 +235,7 @@ async function runSourceCollection(sources, options = {}) {
     });
     if (!response.ok) throw new Error(await response.text());
     const result = await response.json();
-    lastCollected = result.resources || [];
+    lastCollected = (result.resources || []).filter((item) => !isExpired(item));
     const added = addCollectedResources(lastCollected);
     const failed = Array.isArray(result.errors) ? result.errors : [];
     $("#sourceCollectStatus").textContent = failed.length ? `${added}건 추가 · ${failed.length}곳 확인 필요` : `${added}건 추가`;
@@ -250,6 +263,7 @@ function addCollectedResources(resources) {
   let added = 0;
   resources.forEach((item) => {
     const resource = normalizeResource({ ...item, status: "검토 필요" });
+    if (isExpired(resource)) return;
     const keys = resourceKeys(resource);
     if (!keys.length || keys.some((key) => known.has(key))) return;
     state.resources.unshift(resource);
@@ -411,6 +425,7 @@ async function saveReviewResource(event) {
     status: existing?.status || "검토 필요",
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    important: existing?.important || false,
     sample: existing?.sample || false
   });
   const index = state.resources.findIndex((item) => item.id === id);
@@ -431,11 +446,13 @@ function clearReview() {
 }
 
 function renderAll() {
+  archiveExpiredResources();
   const selectedRegion = $("#dashboardRegion").value;
   fillOptions("#dashboardRegion", ["전체 지역", ...regions()]);
   if (regions().includes(selectedRegion)) $("#dashboardRegion").value = selectedRegion;
   renderDashboard();
   renderResources();
+  renderImportantResources();
   renderTrash();
   $("#briefOutput").value = buildBrief();
 }
@@ -455,7 +472,7 @@ function renderTrash() {
               <span>${escapeHtml(item.agency || "기관 미기재")}</span>
               <span>${escapeHtml(item.category)}</span>
               <span>${escapeHtml(item.region)}</span>
-              <span>삭제 ${escapeHtml(new Date(item.deletedAt).toLocaleString("ko-KR"))}</span>
+              <span>${item.deletedReason === "expired" ? "마감 자동 이동" : "삭제"} ${escapeHtml(new Date(item.deletedAt).toLocaleString("ko-KR"))}</span>
             </div>
           </div>
           <span class="status-chip">재수집 차단</span>
@@ -593,6 +610,7 @@ function renderResources() {
   $("#resourceList").innerHTML = items.length ? resourceCategoryGroups(items) : emptyState("조건에 맞는 자원이 없습니다.");
   $$(".edit-resource").forEach((button) => button.addEventListener("click", () => editResource(button.dataset.id)));
   $$(".delete-resource").forEach((button) => button.addEventListener("click", () => deleteResource(button.dataset.id)));
+  $$("#resourceList .toggle-important").forEach((button) => button.addEventListener("click", () => toggleImportant(button.dataset.id)));
   $$(".status-select").forEach((select) => select.addEventListener("change", () => updateStatus(select.dataset.id, select.value)));
   $$(".resource-attachment-input").forEach((input) => input.addEventListener("change", () => addResourceAttachments(input.dataset.id, input.files)));
   $$(".paste-capture-button").forEach((button) => button.addEventListener("click", () => pasteClipboardCapture(button.dataset.id)));
@@ -701,6 +719,7 @@ function resourceCard(item) {
       ${imageAttachments.length ? attachmentSlides(imageAttachments) : ""}
       ${item.attachments?.length ? attachmentOrderList(item) : ""}
       <div class="resource-actions">
+        <button class="important-button toggle-important ${item.important ? "active" : ""}" type="button" data-id="${item.id}" aria-pressed="${item.important}" aria-label="${item.important ? "중요 자원 해제" : "중요 자원으로 표시"}">${item.important ? "★ 중요" : "☆ 중요"}</button>
         <input id="${escapeHtml(inputId)}" class="sr-only resource-attachment-input" type="file" multiple data-id="${escapeHtml(item.id)}" accept="image/*,application/pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
         <label class="attachment-button compact-attach-button" for="${escapeHtml(inputId)}">캡처/첨부 추가</label>
         <button class="ghost-button paste-capture-button" type="button" data-id="${escapeHtml(item.id)}">캡처 붙여넣기</button>
@@ -710,6 +729,34 @@ function resourceCard(item) {
       <div class="paste-capture-zone" tabindex="0" data-id="${escapeHtml(item.id)}">캡처한 화면은 여기에 Ctrl+V</div>
     </article>
   `;
+}
+
+function renderImportantResources() {
+  const items = state.resources.filter((item) => item.important).sort(resourcePriority);
+  $("#importantCount").textContent = formatNumber(items.length);
+  $("#importantList").innerHTML = items.length ? items.map((item) => `
+    <article class="resource-card important-card" data-resource-id="${escapeHtml(item.id)}">
+      <div class="resource-head">
+        <div>
+          <h3 class="resource-title">${escapeHtml(item.title)}</h3>
+          <div class="resource-meta">
+            <span>${escapeHtml(item.agency || "기관 미기재")}</span>
+            <span>${escapeHtml(item.category)}</span>
+            <span>${escapeHtml(item.region)}</span>
+            <span>${escapeHtml(item.deadline ? `${item.deadline} ${daysLeftText(item.deadline)}` : "상시/미정")}</span>
+          </div>
+        </div>
+        <span class="important-badge">★ 중요</span>
+      </div>
+      <p class="resource-summary">${escapeHtml(item.summary || "요약 없음")}</p>
+      <div class="resource-actions">
+        <button class="ghost-button open-important-resource" type="button" data-id="${escapeHtml(item.id)}">자원 보기</button>
+        <button class="important-button active toggle-important" type="button" data-id="${escapeHtml(item.id)}">★ 중요 해제</button>
+      </div>
+    </article>
+  `).join("") : emptyState("중요 자원으로 표시한 항목이 없습니다.");
+  $$("#importantList .toggle-important").forEach((button) => button.addEventListener("click", () => toggleImportant(button.dataset.id)));
+  $$(".open-important-resource").forEach((button) => button.addEventListener("click", () => focusResource(button.dataset.id)));
 }
 
 function focusResource(id) {
@@ -867,7 +914,7 @@ function editResource(id) {
 function deleteResource(id) {
   const item = state.resources.find((resource) => resource.id === id);
   if (!item || !confirm(`"${item.title}" 자원을 휴지통으로 이동할까요?\n자동 수집에서도 다시 추가되지 않습니다.`)) return;
-  const deleted = { ...item, deletedAt: new Date().toISOString() };
+  const deleted = { ...item, deletedAt: new Date().toISOString(), deletedReason: "manual" };
   state.trash.unshift(deleted);
   const blocked = new Set(state.blockedKeys);
   resourceKeys(item).forEach((key) => blocked.add(key));
@@ -878,9 +925,40 @@ function deleteResource(id) {
   showToast("휴지통으로 이동하고 재수집을 차단했습니다.");
 }
 
+function archiveExpiredResources() {
+  const expired = state.resources.filter(isExpired);
+  if (!expired.length) return 0;
+  const expiredIds = new Set(expired.map((item) => item.id));
+  const blocked = new Set(state.blockedKeys);
+  const deletedAt = new Date().toISOString();
+  expired.forEach((item) => resourceKeys(item).forEach((key) => blocked.add(key)));
+  state.trash = [
+    ...expired.map((item) => ({ ...item, deletedAt, deletedReason: "expired" })),
+    ...state.trash
+  ];
+  state.resources = state.resources.filter((item) => !expiredIds.has(item.id));
+  state.blockedKeys = [...blocked];
+  saveState();
+  return expired.length;
+}
+
+function toggleImportant(id) {
+  const item = state.resources.find((resource) => resource.id === id);
+  if (!item) return;
+  item.important = !item.important;
+  item.updatedAt = new Date().toISOString();
+  saveState();
+  renderAll();
+  showToast(item.important ? "중요 자원으로 표시했습니다." : "중요 표시를 해제했습니다.");
+}
+
 function restoreResource(id) {
   const item = state.trash.find((resource) => resource.id === id);
   if (!item) return;
+  if (isExpired(item)) {
+    showToast("마감이 지난 자원은 복원할 수 없습니다.");
+    return;
+  }
   const { deletedAt, ...restored } = item;
   state.trash = state.trash.filter((resource) => resource.id !== id);
   const restoredKeys = new Set(resourceKeys(item));
@@ -1105,7 +1183,11 @@ function restoreJson() {
       const restored = JSON.parse(String(reader.result || "{}"));
       state.resources = Array.isArray(restored.resources) ? restored.resources.map(normalizeResource) : [];
       state.trash = Array.isArray(restored.trash)
-        ? restored.trash.map((item) => ({ ...normalizeResource(item), deletedAt: item.deletedAt || new Date().toISOString() }))
+        ? restored.trash.map((item) => ({
+          ...normalizeResource(item),
+          deletedAt: item.deletedAt || new Date().toISOString(),
+          deletedReason: item.deletedReason || "manual"
+        }))
         : [];
       state.blockedKeys = Array.isArray(restored.blockedKeys) ? restored.blockedKeys : [];
       state.filters = restored.filters || {};
@@ -1249,6 +1331,12 @@ function isDueSoon(item) {
   if (!item.deadline) return false;
   const days = daysLeft(item.deadline);
   return days >= 0 && days <= 7;
+}
+
+function isExpired(item) {
+  if (!item?.deadline) return false;
+  const days = daysLeft(item.deadline);
+  return !Number.isNaN(days) && days < 0;
 }
 
 function daysLeft(deadline) {
