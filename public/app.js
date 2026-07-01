@@ -302,14 +302,15 @@ function setInputMode(mode) {
 }
 
 async function analyzeSource() {
-  const payload = sourcePayload();
-  if (!payload.url && !payload.text && inputMode !== "manual") {
-    showToast("정리할 URL 또는 텍스트를 입력하세요.");
-    return;
-  }
+  let payload;
   $("#analyzeSource").disabled = true;
   $("#analyzeSource").textContent = "정리 중";
   try {
+    payload = inputMode === "document" ? await documentPayload() : sourcePayload();
+    if (!payload.url && !payload.text && inputMode !== "manual") {
+      showToast(inputMode === "document" ? "한글파일을 선택하세요." : "정리할 URL 또는 텍스트를 입력하세요.");
+      return;
+    }
     const response = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -325,13 +326,72 @@ async function analyzeSource() {
     }), result.confidence || "확인 필요");
     showToast("핵심 정보를 정리했습니다. 저장 전 한 번 확인하세요.");
   } catch (error) {
-    const fallback = fallbackAnalyze(payload);
-    showReview(fallback, "AI 연결 실패, 기본 추출");
-    showToast("AI 정리에 실패해 기본 추출 결과를 만들었습니다.");
+    if (payload) {
+      const fallback = fallbackAnalyze(payload);
+      showReview(fallback, "AI 연결 실패, 기본 추출");
+      showToast("AI 정리에 실패해 기본 추출 결과를 만들었습니다.");
+    } else {
+      $("#documentStatus").textContent = error.message || "한글파일을 읽지 못했습니다.";
+      showToast(error.message || "한글파일을 읽지 못했습니다.");
+    }
   } finally {
     $("#analyzeSource").disabled = false;
     $("#analyzeSource").textContent = "AI로 정리";
   }
+}
+
+async function documentPayload() {
+  const file = $("#sourceDocument").files[0];
+  if (!file) return { mode: "text", text: "" };
+  if (file.size > 15 * 1024 * 1024) throw new Error("15MB 이하의 문서 파일을 선택하세요.");
+  $("#documentStatus").textContent = `${file.name} 본문을 읽는 중입니다.`;
+  let text = "";
+  let format = "";
+  if (file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf") {
+    format = "pdf";
+    text = await extractPdfText(file);
+  } else {
+    const module = await import("./vendor/hwpxjs.browser.mjs");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    format = module.detectFormat(bytes);
+    if (format === "hwp") {
+      text = await module.hwpToText(bytes);
+    } else if (format === "hwpx") {
+      const reader = new module.HwpxReader();
+      await reader.loadFromArrayBuffer(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      text = await reader.extractText();
+    } else if (format === "hwp3") {
+      throw new Error("한글 3.0 문서는 HWPX로 변환한 뒤 다시 시도하세요.");
+    } else {
+      throw new Error("지원하는 HWP, HWPX 또는 PDF 파일이 아닙니다.");
+    }
+  }
+  const cleaned = String(text || "").replace(/\u0000/g, "").trim();
+  if (cleaned.length < 10) {
+    throw new Error(format === "pdf"
+      ? "PDF에서 글자를 찾지 못했습니다. 스캔본은 OCR 처리 후 다시 시도하세요."
+      : "문서에서 읽을 수 있는 본문을 찾지 못했습니다.");
+  }
+  $("#documentStatus").textContent = `${file.name} · 본문 ${formatNumber(cleaned.length)}자 추출 완료`;
+  return {
+    mode: "text",
+    text: `[파일명: ${file.name}]\n${cleaned}`
+  };
+}
+
+async function extractPdfText(file) {
+  const pdfjs = await import("./vendor/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL("./vendor/pdf.worker.mjs", window.location.href).href;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const document = await pdfjs.getDocument({ data: bytes }).promise;
+  const pages = [];
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    const page = await document.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const text = content.items.map((item) => item.str || "").join(" ").replace(/\s+/g, " ").trim();
+    if (text) pages.push(`[${pageNumber}쪽]\n${text}`);
+  }
+  return pages.join("\n\n");
 }
 
 function sourcePayload() {

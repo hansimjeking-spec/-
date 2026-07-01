@@ -103,13 +103,14 @@
         <div class="section-heading">
           <div>
             <h2>정보 수집</h2>
-            <p>URL, 공고문 텍스트, 전화 메모를 붙여넣으면 핵심 정보를 자동 정리합니다.</p>
+            <p>URL, 한글 공문, 공고문 텍스트, 전화 메모를 넣으면 핵심 정보를 자동 정리합니다.</p>
           </div>
         </div>
 
         <form class="panel collect-panel" id="collectForm">
           <div class="mode-tabs" role="tablist" aria-label="입력 방식">
             <button class="mode-tab active" type="button" data-mode="url">URL</button>
+            <button class="mode-tab" type="button" data-mode="document">문서파일</button>
             <button class="mode-tab" type="button" data-mode="text">텍스트</button>
             <button class="mode-tab" type="button" data-mode="manual">직접 입력</button>
           </div>
@@ -119,6 +120,14 @@
           </div>
           <div class="input-mode" id="textMode">
             <label>공고문 또는 메모<textarea id="sourceText" rows="9" placeholder="지원 내용, 대상, 기간, 신청 방법, 연락처 등을 붙여넣기"></textarea></label>
+          </div>
+          <div class="input-mode" id="documentMode">
+            <label class="document-drop">
+              <span>한글·PDF 안내문 또는 공문 선택</span>
+              <input id="sourceDocument" type="file" accept=".hwp,.hwpx,.pdf,application/pdf,application/x-hwp,application/haansofthwp">
+              <small>HWP 5.0, HWPX, 텍스트형 PDF를 지원합니다. 암호·배포용 문서와 스캔 PDF는 읽지 못할 수 있습니다.</small>
+            </label>
+            <p class="source-help" id="documentStatus">선택한 파일의 본문과 표 내용을 읽어 자동 정리합니다.</p>
           </div>
           <div class="input-mode" id="manualMode">
             <div class="form-grid">

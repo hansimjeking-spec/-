@@ -6,5 +6,9 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "vercel-build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@ssabrojs/hwpxjs": "0.4.0",
+    "pdfjs-dist": "5.6.205"
   }
 }
