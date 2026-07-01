@@ -129,16 +129,41 @@ function normalize(item, source) {
 
 function fallback(source) {
   const text = source.text || "";
+  const lines = text.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const title = lines.find((line) => !line.startsWith("[파일명:")) || "새 복지자원";
   return normalize({
-    title: text.split(/[.\n]/).find(Boolean)?.trim().slice(0, 80) || "새 복지자원",
+    title: title.slice(0, 80),
+    agency: labeledValue(lines, ["시행기관", "주관기관", "담당기관", "기관"]),
     category: guessCategory(text),
     region: guessRegion(text),
-    deadline: text.match(/20\d{2}[.-]\d{1,2}[.-]\d{1,2}/)?.[0]?.replaceAll(".", "-") || "",
+    deadline: extractDeadline(text),
     contact: text.match(/\d{2,4}-\d{3,4}-\d{4}/)?.[0] || "",
     summary: text.replace(/\s+/g, " ").slice(0, 220),
+    applyMethod: labeledValue(lines, ["신청방법", "접수방법", "신청 방법", "접수 방법"]),
     targets: guessTargets(text),
     tags: []
   }, source);
+}
+
+function labeledValue(lines, labels) {
+  for (const line of lines) {
+    for (const label of labels) {
+      const match = line.match(new RegExp(`^${label}\\s*[:：]?\\s*(.+)$`));
+      if (match?.[1]) return match[1].trim().slice(0, 300);
+    }
+  }
+  return "";
+}
+
+function extractDeadline(text) {
+  const matches = [...String(text).matchAll(/(20\d{2})\s*(?:년|[./-])\s*(\d{1,2})\s*(?:월|[./-])\s*(\d{1,2})\s*일?/g)];
+  if (!matches.length) return "";
+  const dates = matches.map((match) => {
+    const month = String(match[2]).padStart(2, "0");
+    const day = String(match[3]).padStart(2, "0");
+    return `${match[1]}-${month}-${day}`;
+  });
+  return dates.sort().at(-1) || "";
 }
 
 function guessTargets(text) {
