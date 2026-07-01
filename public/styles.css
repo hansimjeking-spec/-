@@ -288,6 +288,35 @@ label textarea {
   box-shadow: var(--shadow);
 }
 
+.important-card {
+  border-left: 4px solid #d69a13;
+}
+
+.important-button,
+.important-badge {
+  border: 1px solid #d9b454;
+  border-radius: 7px;
+  background: #fffaf0;
+  color: #8a5a00;
+  font-weight: 800;
+}
+
+.important-button {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.important-button:hover,
+.important-button.active {
+  background: #fff1bd;
+  border-color: #c58a00;
+}
+
+.important-badge {
+  padding: 6px 9px;
+  white-space: nowrap;
+}
+
 .metric {
   padding: 18px;
   display: grid;

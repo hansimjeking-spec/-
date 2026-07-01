@@ -73,7 +73,7 @@ export default async function handler(request, response) {
 
     response.status(200).json({
       collectedAt: new Date().toISOString(),
-      resources: uniqueResources(resources),
+      resources: uniqueResources(resources).filter((resource) => !isExpiredResource(resource)),
       errors
     });
   } catch (error) {
@@ -560,6 +560,12 @@ function daysLeft(deadline) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.round((new Date(`${deadline}T00:00:00`) - today) / 86400000);
+}
+
+function isExpiredResource(resource) {
+  if (!resource?.deadline) return false;
+  const days = daysLeft(resource.deadline);
+  return !Number.isNaN(days) && days < 0;
 }
 
 function uniqueResources(resources) {
