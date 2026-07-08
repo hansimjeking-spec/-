@@ -18,16 +18,24 @@ for (const file of [
   "radar-supabase.css",
   "radar-supabase.js",
   "radar-staff.css",
-  "radar-staff.js"
+  "radar-staff.js",
+  "radar-auth-guard.css",
+  "radar-auth-guard.js"
 ]) {
   await copyFile(file, `public/${file}`);
 }
 
 let html = await readFile("public/index.html", "utf8");
-if (!html.includes("radar-staff.js")) {
-  html = html.replace("</body>", "  <script src=\"./radar-staff.js\" type=\"module\"></script>\n</body>");
-  await writeFile("public/index.html", html);
+const extraScripts = [
+  "radar-staff.js",
+  "radar-auth-guard.js"
+];
+for (const script of extraScripts) {
+  if (!html.includes(script)) {
+    html = html.replace("</body>", `  <script src="./${script}" type="module"></script>\n</body>`);
+  }
 }
+await writeFile("public/index.html", html);
 
 await copyFile("supabase-schema.sql", "public/supabase-schema.sql");
 await copyFile(
