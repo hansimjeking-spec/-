@@ -1,0 +1,103 @@
+.radar-auth-ribbon {
+  margin: 0 0 16px;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.radar-auth-ribbon strong {
+  display: block;
+  color: #111827;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.radar-auth-ribbon span {
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.radar-auth-pill {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.radar-auth-pill.warn {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.radar-auth-pill.lock {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.radar-auth-locked-panel {
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  background: #f8fafc;
+  padding: 16px;
+  margin: 12px 0 18px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.radar-auth-disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+body.radar-db-guest #radarOpsPanel,
+body.radar-db-staff #radarOpsPanel,
+body.radar-db-guest #radarGovernancePanel,
+body.radar-db-staff #radarGovernancePanel {
+  display: none !important;
+}
+
+body.radar-db-guest #reviewPanel,
+body.radar-db-staff #reviewPanel {
+  opacity: 0.56;
+  pointer-events: none;
+}
+
+body.radar-db-guest .admin-only,
+body.radar-db-staff .admin-only {
+  display: none !important;
+}
+
+body.radar-db-admin .radar-admin-only,
+body.radar-db-manager .radar-manager-only,
+body.radar-db-admin .radar-manager-only {
+  display: initial;
+}
+
+.radar-admin-only,
+.radar-manager-only {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .radar-auth-ribbon {
+    display: block;
+  }
+
+  .radar-auth-pill {
+    display: inline-flex;
+    margin-top: 10px;
+  }
+}
