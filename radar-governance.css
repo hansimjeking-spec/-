@@ -1,0 +1,212 @@
+.radar-governance-panel {
+  margin: 0 0 22px;
+}
+
+.radar-governance-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.82fr);
+  gap: 16px;
+}
+
+.radar-governance-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.06);
+}
+
+.radar-governance-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.radar-governance-head strong {
+  display: block;
+  font-size: 19px;
+  letter-spacing: -0.03em;
+}
+
+.radar-governance-head span,
+.radar-governance-help,
+.radar-governance-alert,
+.radar-governance-checks li,
+.radar-governance-dbcode,
+.radar-governance-restore-note {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.radar-governance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.radar-governance-button,
+.radar-governance-file-label,
+.radar-governance-select {
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  background: #fff;
+  color: #111827;
+  font-weight: 900;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radar-governance-button.primary,
+.radar-governance-file-label.primary {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.radar-governance-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.radar-governance-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.radar-governance-stat {
+  border-radius: 16px;
+  border: 1px solid #eef2f7;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.radar-governance-stat span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.radar-governance-stat strong {
+  display: block;
+  color: #111827;
+  font-size: 24px;
+  letter-spacing: -0.05em;
+}
+
+.radar-governance-checks {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.radar-governance-checks li {
+  border-radius: 14px;
+  border: 1px solid #eef2f7;
+  background: #fbfdff;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+}
+
+.radar-governance-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 5px;
+  background: #22c55e;
+}
+
+.radar-governance-dot.warn {
+  background: #f59e0b;
+}
+
+.radar-governance-dot.danger {
+  background: #ef4444;
+}
+
+.radar-governance-alert {
+  border: 1px dashed #bfdbfe;
+  border-radius: 16px;
+  background: #eff6ff;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.radar-governance-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.radar-governance-dbcode {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #dbeafe;
+  overflow: auto;
+  white-space: pre-wrap;
+  max-height: 220px;
+}
+
+body.radar-privacy-on .radar-ops-result b,
+body.radar-privacy-on .radar-lounge-row b {
+  filter: blur(4px);
+}
+
+body.radar-privacy-on .radar-privacy-badge {
+  display: inline-flex;
+}
+
+.radar-privacy-badge {
+  display: none;
+  margin-left: 8px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@media (max-width: 1120px) {
+  .radar-governance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .radar-governance-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .radar-governance-head {
+    display: block;
+  }
+
+  .radar-governance-actions {
+    margin-top: 10px;
+  }
+
+  .radar-governance-stats {
+    grid-template-columns: 1fr;
+  }
+}
