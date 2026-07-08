@@ -10,7 +10,9 @@ for (const file of [
   "radar-enhancements.css",
   "radar-enhancements.js",
   "radar-lounge.css",
-  "radar-lounge.js"
+  "radar-lounge.js",
+  "radar-ops.css",
+  "radar-ops.js"
 ]) {
   await copyFile(file, `public/${file}`);
 }
