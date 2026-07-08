@@ -31,7 +31,8 @@ function escapeHtml(value) {
 function splitList(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
   return String(value || "").split(/[,;·/\n]/).map((item) => item.trim()).filter(Boolean);
-}\n
+}
+
 function daysLeft(deadline) {
   if (!deadline) return null;
   const today = new Date();
