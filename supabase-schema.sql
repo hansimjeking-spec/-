@@ -1,6 +1,7 @@
 -- Welfare Resource Radar Supabase schema
 -- 1) Supabase SQL Editor에서 실행하세요.
 -- 2) 실제 기관 공유 전에 RLS 정책을 기관 환경에 맞게 재검토하세요.
+-- 3) service role key는 앱에 넣지 마세요. 브라우저에는 anon key만 사용합니다.
 
 create extension if not exists "pgcrypto";
 
@@ -77,6 +78,50 @@ create table if not exists public.radar_ops_logs (
   created_at timestamptz not null default now()
 );
 
+create or replace function public.radar_touch_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function public.radar_lock_profile_role()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.role is distinct from new.role and not public.radar_is_admin() then
+    raise exception 'Only admin can change radar profile role';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists radar_profiles_touch_updated_at on public.radar_profiles;
+create trigger radar_profiles_touch_updated_at
+  before update on public.radar_profiles
+  for each row execute function public.radar_touch_updated_at();
+
+drop trigger if exists radar_resources_touch_updated_at on public.radar_resources;
+create trigger radar_resources_touch_updated_at
+  before update on public.radar_resources
+  for each row execute function public.radar_touch_updated_at();
+
+drop trigger if exists radar_beneficiaries_touch_updated_at on public.radar_beneficiaries;
+create trigger radar_beneficiaries_touch_updated_at
+  before update on public.radar_beneficiaries
+  for each row execute function public.radar_touch_updated_at();
+
+drop trigger if exists radar_profiles_lock_role on public.radar_profiles;
+create trigger radar_profiles_lock_role
+  before update on public.radar_profiles
+  for each row execute function public.radar_lock_profile_role();
+
 alter table public.radar_profiles enable row level security;
 alter table public.radar_resources enable row level security;
 alter table public.radar_beneficiaries enable row level security;
@@ -114,18 +159,24 @@ as $$
   );
 $$;
 
-drop policy if exists "profiles_read_own" on public.radar_profiles;
-create policy "profiles_read_own" on public.radar_profiles
+-- 프로필: 본인은 자기 프로필을 만들고 읽을 수 있지만, role 변경은 트리거가 막습니다.
+drop policy if exists "profiles_read_own_or_admin" on public.radar_profiles;
+create policy "profiles_read_own_or_admin" on public.radar_profiles
   for select using (id = auth.uid() or public.radar_is_admin());
 
-drop policy if exists "profiles_insert_own" on public.radar_profiles;
-create policy "profiles_insert_own" on public.radar_profiles
-  for insert with check (id = auth.uid());
+drop policy if exists "profiles_insert_own_staff" on public.radar_profiles;
+create policy "profiles_insert_own_staff" on public.radar_profiles
+  for insert with check (id = auth.uid() and role = 'staff');
 
-drop policy if exists "profiles_update_admin" on public.radar_profiles;
-create policy "profiles_update_admin" on public.radar_profiles
-  for update using (id = auth.uid() or public.radar_is_admin());
+drop policy if exists "profiles_update_own_no_role" on public.radar_profiles;
+create policy "profiles_update_own_no_role" on public.radar_profiles
+  for update using (id = auth.uid()) with check (id = auth.uid());
 
+drop policy if exists "profiles_admin_all" on public.radar_profiles;
+create policy "profiles_admin_all" on public.radar_profiles
+  for all using (public.radar_is_admin()) with check (public.radar_is_admin());
+
+-- 자원: 직원은 조회, 담당자 이상은 등록·수정·삭제.
 drop policy if exists "resources_staff_read" on public.radar_resources;
 create policy "resources_staff_read" on public.radar_resources
   for select using (public.radar_is_staff());
@@ -134,6 +185,7 @@ drop policy if exists "resources_manager_write" on public.radar_resources;
 create policy "resources_manager_write" on public.radar_resources
   for all using (public.radar_is_manager()) with check (public.radar_is_manager());
 
+-- 대상자: 민감정보라 담당자 이상만 조회/수정.
 drop policy if exists "beneficiaries_manager_read" on public.radar_beneficiaries;
 create policy "beneficiaries_manager_read" on public.radar_beneficiaries
   for select using (public.radar_is_manager());
@@ -142,10 +194,12 @@ drop policy if exists "beneficiaries_manager_write" on public.radar_beneficiarie
 create policy "beneficiaries_manager_write" on public.radar_beneficiaries
   for all using (public.radar_is_manager()) with check (public.radar_is_manager());
 
+-- 매칭 결과: 대상자와 연결되므로 담당자 이상만.
 drop policy if exists "matches_manager_all" on public.radar_resource_matches;
 create policy "matches_manager_all" on public.radar_resource_matches
   for all using (public.radar_is_manager()) with check (public.radar_is_manager());
 
+-- 체크리스트: 직원은 조회, 담당자 이상은 수정.
 drop policy if exists "workflow_staff_read" on public.radar_workflow_checks;
 create policy "workflow_staff_read" on public.radar_workflow_checks
   for select using (public.radar_is_staff());
@@ -154,6 +208,7 @@ drop policy if exists "workflow_manager_write" on public.radar_workflow_checks;
 create policy "workflow_manager_write" on public.radar_workflow_checks
   for all using (public.radar_is_manager()) with check (public.radar_is_manager());
 
+-- 업무 로그: 로그인 직원은 조회/추가 가능.
 drop policy if exists "ops_logs_staff_read" on public.radar_ops_logs;
 create policy "ops_logs_staff_read" on public.radar_ops_logs
   for select using (public.radar_is_staff());
@@ -161,3 +216,10 @@ create policy "ops_logs_staff_read" on public.radar_ops_logs
 drop policy if exists "ops_logs_staff_insert" on public.radar_ops_logs;
 create policy "ops_logs_staff_insert" on public.radar_ops_logs
   for insert with check (public.radar_is_staff());
+
+-- 최초 관리자 지정용 SQL 예시
+-- 1) Supabase Authentication에서 본인 이메일로 로그인한 뒤 user id를 확인합니다.
+-- 2) SQL Editor에서 아래 형태로 1회 실행합니다.
+-- insert into public.radar_profiles (id, display_name, role)
+-- values ('본인-auth-user-id', '관리자 이름', 'admin')
+-- on conflict (id) do update set role = 'admin', display_name = excluded.display_name;
