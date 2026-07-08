@@ -1,0 +1,199 @@
+.radar-ops-panel {
+  margin: 18px 0 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.radar-ops-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+  gap: 16px;
+}
+
+.radar-ops-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.06);
+}
+
+.radar-ops-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.radar-ops-head strong {
+  display: block;
+  font-size: 19px;
+  letter-spacing: -0.03em;
+}
+
+.radar-ops-head span,
+.radar-ops-help,
+.radar-ops-empty,
+.radar-ops-log span,
+.radar-ops-result span {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.radar-ops-actions,
+.radar-ops-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.radar-ops-button,
+.radar-ops-file-label {
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  background: #fff;
+  color: #111827;
+  font-weight: 900;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.radar-ops-button.primary,
+.radar-ops-file-label.primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.radar-ops-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.radar-ops-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.radar-ops-stat {
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  padding: 12px;
+}
+
+.radar-ops-stat span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.radar-ops-stat strong {
+  font-size: 25px;
+  letter-spacing: -0.05em;
+}
+
+.radar-ops-results {
+  display: grid;
+  gap: 10px;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.radar-ops-result {
+  border: 1px solid #eef2f7;
+  border-radius: 16px;
+  background: #fbfdff;
+  padding: 13px;
+  display: grid;
+  gap: 7px;
+}
+
+.radar-ops-result b {
+  display: block;
+  color: #111827;
+}
+
+.radar-ops-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.radar-ops-pills i {
+  font-style: normal;
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.radar-ops-side {
+  display: grid;
+  gap: 16px;
+}
+
+.radar-ops-log {
+  display: grid;
+  gap: 9px;
+}
+
+.radar-ops-log div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.radar-ops-log em {
+  font-style: normal;
+  font-weight: 900;
+  color: #0f766e;
+}
+
+.radar-ops-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 15px;
+  background: #f8fafc;
+}
+
+@media (max-width: 1120px) {
+  .radar-ops-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .radar-ops-head {
+    display: block;
+  }
+
+  .radar-ops-actions {
+    margin-top: 10px;
+  }
+
+  .radar-ops-stats {
+    grid-template-columns: 1fr;
+  }
+}
