@@ -1,4 +1,4 @@
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 await mkdir("public", { recursive: true });
 await mkdir("public/vendor", { recursive: true });
@@ -16,9 +16,17 @@ for (const file of [
   "radar-governance.css",
   "radar-governance.js",
   "radar-supabase.css",
-  "radar-supabase.js"
+  "radar-supabase.js",
+  "radar-staff.css",
+  "radar-staff.js"
 ]) {
   await copyFile(file, `public/${file}`);
+}
+
+let html = await readFile("public/index.html", "utf8");
+if (!html.includes("radar-staff.js")) {
+  html = html.replace("</body>", "  <script src=\"./radar-staff.js\" type=\"module\"></script>\n</body>");
+  await writeFile("public/index.html", html);
 }
 
 await copyFile("supabase-schema.sql", "public/supabase-schema.sql");
