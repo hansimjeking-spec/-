@@ -3,7 +3,13 @@ import { copyFile, mkdir } from "node:fs/promises";
 await mkdir("public", { recursive: true });
 await mkdir("public/vendor", { recursive: true });
 
-for (const file of ["index.html", "styles.css", "app.js"]) {
+for (const file of [
+  "index.html",
+  "styles.css",
+  "app.js",
+  "radar-enhancements.css",
+  "radar-enhancements.js"
+]) {
   await copyFile(file, `public/${file}`);
 }
 
