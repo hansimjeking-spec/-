@@ -14,11 +14,14 @@ for (const file of [
   "radar-ops.css",
   "radar-ops.js",
   "radar-governance.css",
-  "radar-governance.js"
+  "radar-governance.js",
+  "radar-supabase.css",
+  "radar-supabase.js"
 ]) {
   await copyFile(file, `public/${file}`);
 }
 
+await copyFile("supabase-schema.sql", "public/supabase-schema.sql");
 await copyFile(
   "node_modules/@ssabrojs/hwpxjs/dist/browser/hwpxjs.browser.mjs",
   "public/vendor/hwpxjs.browser.mjs"
