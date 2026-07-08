@@ -1,4 +1,5 @@
 import "./radar-ops.js";
+import "./radar-governance.js";
 
 const STATE_KEY = "welfareResourceRadar.v1";
 const AUTO_KEY = "welfareResourceRadar.lastAutoCollectDate";
@@ -30,8 +31,7 @@ function escapeHtml(value) {
 function splitList(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
   return String(value || "").split(/[,;·/\n]/).map((item) => item.trim()).filter(Boolean);
-}
-
+}\n
 function daysLeft(deadline) {
   if (!deadline) return null;
   const today = new Date();
@@ -235,7 +235,6 @@ function renderLounge() {
 
   const { resources } = readState();
   const dueSoon = resources.filter(isDueSoon).sort((a, b) => String(a.deadline || "9999").localeCompare(String(b.deadline || "9999")));
-  const urgent = resources.filter((item) => item.urgency === "높음");
   const review = resources.filter((item) => (item.status || "검토 필요") === "검토 필요");
   const missingApply = resources.filter((item) => !item.applyMethod || !item.contact);
   const priority = [...resources].sort((a, b) => score(b) - score(a)).slice(0, 5);
