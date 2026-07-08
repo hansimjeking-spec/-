@@ -8,7 +8,9 @@ for (const file of [
   "styles.css",
   "app.js",
   "radar-enhancements.css",
-  "radar-enhancements.js"
+  "radar-enhancements.js",
+  "radar-lounge.css",
+  "radar-lounge.js"
 ]) {
   await copyFile(file, `public/${file}`);
 }
