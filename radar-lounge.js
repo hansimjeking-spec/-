@@ -1,5 +1,6 @@
 import "./radar-ops.js";
 import "./radar-governance.js";
+import "./radar-supabase.js";
 
 const STATE_KEY = "welfareResourceRadar.v1";
 const AUTO_KEY = "welfareResourceRadar.lastAutoCollectDate";
