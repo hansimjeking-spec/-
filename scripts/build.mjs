@@ -2,6 +2,7 @@ import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 await mkdir("public", { recursive: true });
 await mkdir("public/vendor", { recursive: true });
+await mkdir("public/share", { recursive: true });
 
 for (const file of [
   "index.html",
@@ -36,6 +37,7 @@ for (const script of extraScripts) {
   }
 }
 await writeFile("public/index.html", html);
+await copyFile("share/index.html", "public/share/index.html");
 
 await copyFile("supabase-schema.sql", "public/supabase-schema.sql");
 await copyFile(
